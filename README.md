@@ -1,1 +1,1 @@
-# Research-Methods-for-Cyberspace-Behavior-and-e-Therapy
+# Research Methods for Cyberspace Behavior and e Therapy
