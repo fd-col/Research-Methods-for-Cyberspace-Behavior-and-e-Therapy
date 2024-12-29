@@ -1,0 +1,138 @@
+## Load dataset from YALE0065_OUTPUT_cleaned.xlsx file
+
+```{r}
+
+library(car)
+
+# Load the data (update the path as needed)
+library(readxl)
+data <- read_excel("YALE0065_OUTPUT_cleaned.xlsx", sheet = "Combined sheet")
+```
+
+### *generation* and *educ* into factors and relabeling
+
+```{r}
+# Convert generation and educ to factors
+data$generation <- as.factor(data$generation)
+data$educ <- as.factor(data$educ)
+
+# Relabel `generation` according to the schema
+data$generation <- dplyr::recode(data$generation,
+                          "z" = "Gen Z (1997–2012)",
+                          "y" = "Millennials (1981–1996)",
+                          "x" = "Gen X (1965–1980)",
+                          "b" = "Boomers (1946–1964)",
+                          "s" = "Silent generation (1928–1945)")
+
+# Relabel `educ` according to the schema
+data$educ <- dplyr::recode(data$educ,
+                           "1" = "No HS",
+                           "2" = "High school graduate",
+                           "3" = "Some college",
+                           "4" = "2-year",
+                           "5" = "4-year",
+                           "6" = "Post-grad")
+```
+
+### TWO-WAY ANOVA
+
+```{r}
+# Run the ANOVA
+model <- aov(Risks_Average ~ generation * educ, data = data)
+
+# View the summary of the results
+summary(model)
+```
+
+-   *No main effect of **generation** ( p \> 0.05)*.
+
+-   *No main effect of **educ** ( p \> 0.05)*.
+
+-   *No **interaction** effect* *( p \> 0.05);*
+
+### Compute the Effect Size
+
+```{r}
+# SS values from the ANOVA summary
+SS_generation <- 8.2
+SS_educ <- 1.6
+SS_interaction <- 22.0
+SS_residual <- 1024.5
+
+# Calculate partial η² for generation, education, and interaction
+partial_eta2_generation <- SS_generation / (SS_generation + SS_residual)
+partial_eta2_educ <- SS_educ / (SS_educ + SS_residual)
+partial_eta2_interaction <- SS_interaction / (SS_interaction + SS_residual)
+
+# Print results
+cat("Partial η² for generation:", partial_eta2_generation, "\n")
+cat("Partial η² for education:", partial_eta2_educ, "\n")
+cat("Partial η² for interaction:", partial_eta2_interaction, "\n")
+```
+
+### Check assumptions
+
+```{r}
+# Homogeneity test
+leveneTest(Risks_Average ~ generation*educ,data= data, center="mean")
+```
+
+```{r}
+# Perform Shapiro-Wilk test
+shapiro.test(data$Risks_Average)
+```
+
+### Visualize results
+
+```{r}
+# Compute summary statistics
+library(dplyr)
+summary_data <- data %>%
+  group_by(generation, educ) %>%
+  summarise(mean = mean(Risks_Average, na.rm = TRUE),
+            se = sd(Risks_Average, na.rm = TRUE) / sqrt(n()))
+
+# Bar Plot with Error Bars
+ggplot(summary_data, aes(x = generation, y = mean, fill = educ)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = mean - se, ymax = mean + se), 
+                position = position_dodge(0.9), width = 0.2) +
+  labs(title = "Mean Risks_Average by Generation and Education", 
+       x = "Generation", 
+       y = "Mean Risks_Average",
+       fill = "Education") +
+  theme_minimal()
+```
+
+```{r}
+# Load required libraries
+library(ggplot2)
+library(dplyr)
+
+# Sample data structure (replace with actual data)
+data <- data.frame(
+  Generation = rep(c("Silent Generation", "Boomers", "Generation X", "Millennials", "Generation Z"), each = 6),
+  Education = rep(c("No HS", "High school graduate", "Some college", "2-year", "4-year", "Post-grad"), times = 5),
+  Risks_Average = runif(30, 2.5, 3.5), # Replace with real values
+  SE = runif(30, 0.05, 0.15) # Standard errors
+)
+
+# Adjust Education to be a factor with ordered levels
+data$Education <- factor(data$Education, levels = c("No HS", "High school graduate", "Some college", "2-year", "4-year", "Post-grad"))
+
+# Plot
+ggplot(data, aes(x = Generation, y = Risks_Average, fill = Education)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = Risks_Average - SE, ymax = Risks_Average + SE), 
+                position = position_dodge(0.9), width = 0.25) +
+  labs(
+    title = "Risk Perception of AI by Generation and Education",
+    x = "Generation",
+    y = "Mean Risk Perception (Risks_Average)",
+    fill = "Education Level"
+  ) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set2") + # Use a distinct color palette
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.title = element_text(size = 10))
+```

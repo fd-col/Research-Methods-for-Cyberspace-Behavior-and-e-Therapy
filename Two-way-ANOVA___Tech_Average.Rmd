@@ -1,0 +1,153 @@
+## Load dataset from YALE0065_OUTPUT_cleaned.xlsx file
+
+```{r}
+
+library(car)
+
+# Load the data (update the path as needed)
+library(readxl)
+data <- read_excel("YALE0065_OUTPUT_cleaned.xlsx", sheet = "Combined sheet")
+```
+
+### *generation* and *educ* into factors and relabeling
+
+```{r}
+# Convert generation and educ to factors
+data$generation <- as.factor(data$generation)
+data$educ <- as.factor(data$educ)
+
+# Relabel `generation` according to the schema
+data$generation <- dplyr::recode(data$generation,
+                          "z" = "Gen Z (1997–2012)",
+                          "y" = "Millennials (1981–1996)",
+                          "x" = "Gen X (1965–1980)",
+                          "b" = "Boomers (1946–1964)",
+                          "s" = "Silent generation (1928–1945)")
+
+# Relabel `educ` according to the schema
+data$educ <- dplyr::recode(data$educ,
+                           "1" = "No HS",
+                           "2" = "High school graduate",
+                           "3" = "Some college",
+                           "4" = "2-year",
+                           "5" = "4-year",
+                           "6" = "Post-grad")
+```
+
+### TWO-WAY ANOVA
+
+```{r}
+# Run the ANOVA
+model <- aov(Tech_Average ~ generation * educ, data = data)
+
+# View the summary of the results
+summary(model)
+```
+
+### Compute the Effect Size 
+
+```{r}
+# SS values from the ANOVA summary
+SS_generation <- 2.23
+SS_educ <- 10.68
+SS_interaction <- 1.01
+SS_residual <- 149.22
+
+# Calculate partial η² for generation, education, and interaction
+partial_eta2_generation <- SS_generation / (SS_generation + SS_residual)
+partial_eta2_educ <- SS_educ / (SS_educ + SS_residual)
+partial_eta2_interaction <- SS_interaction / (SS_interaction + SS_residual)
+
+# Print results
+cat("Partial η² for generation:", partial_eta2_generation, "\n")
+cat("Partial η² for education:", partial_eta2_educ, "\n")
+cat("Partial η² for interaction:", partial_eta2_interaction, "\n")
+
+```
+
+###  
+
+### Means and SD for Tech_Average by generation
+
+```{r}
+#Means cat("Means for Tech_Average by generation:\n") 
+Tapply(Tech_Average ~ generation, mean, na.action=na.omit,         data=data) 
+```
+
+```{r}
+# means  cat("\n\nStandard Deviations for EMOTION_Coping by Gender:\n") 
+Tapply(Tech_Average ~ generation, sd, na.action=na.omit,            data=data) # stand dev
+```
+
+### Means and SD for Tech_Average by educ
+
+```{r}
+#Means cat("Means for Tech_Average by educ:\n") 
+Tapply(Tech_Average ~ educ, mean, na.action=na.omit,         data=data) 
+```
+
+```{r}
+# means  cat("\n\nStandard Deviations for Tech_Average by educ:\n") 
+Tapply(Tech_Average ~ educ, sd, na.action=na.omit,            data=data) # stand dev
+```
+
+After finding significant results from **ANOVA** tests, we use a **post-hoc test** (**Tukey's HSD**) *to compare specific groups against each other and determine where the differences lie.*
+
+```{r}
+# Compare means of the groups, using Tukey-Kramer Post-hoc.
+TukeyHSD(model)
+```
+
+### Check assumptions
+
+```{r}
+# Homogeneity test
+leveneTest(Tech_Average ~ generation*educ,data= data, center="mean")
+```
+
+```{r}
+# Perform Shapiro-Wilk test
+shapiro.test(data$Tech_Average)
+```
+
+### Visualize results
+
+```{r}
+# Compute summary statistics for plotting
+summary_data <- data %>%
+  group_by(generation, educ) %>%
+  summarise(mean = mean(Tech_Average, na.rm = TRUE),
+            se = sd(Tech_Average, na.rm = TRUE) / sqrt(n()))
+
+# Bar plot with error bars
+ggplot(summary_data, aes(x = generation, y = mean, fill = educ)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = mean - se, ymax = mean + se), 
+                position = position_dodge(0.9), width = 0.2) +
+  labs(title = "Mean Tech_Average by Generation and Education",
+       x = "Generation",
+       y = "Mean Tech_Average",
+       fill = "Education") +
+  theme_minimal()
+
+
+```
+
+### Calculate and Plot the Estimated Marginal Means (EMM)
+
+```{r}
+# Run the two-way ANOVA
+model <- aov(Tech_Average ~ generation * educ, data = data)
+
+# Load emmeans for visualization
+library(emmeans)
+
+# Get estimated marginal means for the combination of generation and educ
+emm <- emmeans(model, ~ generation * educ)
+
+# Plot the estimated marginal means
+plot(emm, comparisons = TRUE, type = "response", 
+     main = "Estimated Marginal Means of Tech_Average by Generation and Education")
+
+
+```
